@@ -34,6 +34,9 @@ namespace Breeze
     using KDecoration3::ColorRole;
     using KDecoration3::DecorationButtonType;
 
+    QColor col_close = QColor(243, 139, 168);
+    QColor col_maximize = QColor(166, 227, 161);
+    QColor col_minimize = QColor(252, 234, 195);
 
     //__________________________________________________________________
     Button::Button(DecorationButtonType type, Decoration* decoration, QObject* parent)
@@ -210,16 +213,16 @@ namespace Breeze
                         if (d && qGray(d->titleBarColor().rgb()) > 100)
                         {
                             grad.setColorAt(0, isInactive ? inactiveCol
-                                                          : QColor(255, 92, 87));
+                                                          : col_close);
                             grad.setColorAt(1, isInactive ? inactiveCol
-                                                          : QColor(233, 84, 79));
+                                                          : col_close);
                         }
                         else
                         {
                             grad.setColorAt(0, isInactive ? inactiveCol
-                                                          : QColor(250, 100, 102));
+                                                          : col_close);
                             grad.setColorAt(1, isInactive ? inactiveCol
-                                                          : QColor(230, 92, 94));
+                                                          : col_close);
                         }
                         painter->setBrush(QBrush(grad));
                         painter->setPen(Qt::NoPen);
@@ -258,24 +261,24 @@ namespace Breeze
                         if (d && qGray(d->titleBarColor().rgb()) > 100)
                         {
                             grad.setColorAt(0, isChecked() ? isInactive ? inactiveCol
-                                                                        : QColor(67, 198, 176)
+                                                                        : col_maximize
                                                            : isInactive ? inactiveCol
-                                                                        : QColor(40, 211, 63));
+                                                                        : col_maximize);
                             grad.setColorAt(1, isChecked() ? isInactive ? inactiveCol
-                                                                        : QColor(60, 178, 159)
+                                                                        : col_maximize
                                                            : isInactive ? inactiveCol
-                                                                        : QColor(36, 191, 57));
+                                                                        : col_maximize);
                         }
                         else
                         {
                             grad.setColorAt(0, isChecked() ? isInactive ? inactiveCol
-                                                                        : QColor(67, 198, 176)
+                                                                        : col_maximize
                                                            : isInactive ? inactiveCol
-                                                                        : QColor(124, 198, 67));
+                                                                        : col_maximize);
                             grad.setColorAt(1, isChecked() ? isInactive ? inactiveCol
-                                                                        : QColor(60, 178, 159)
+                                                                        : col_maximize
                                                            : isInactive ? inactiveCol
-                                                                        : QColor(111, 178, 60));
+                                                                        : col_maximize);
                         }
                         painter->setBrush(QBrush(grad));
                         painter->setPen(Qt::NoPen);
@@ -326,16 +329,16 @@ namespace Breeze
                         if (d && qGray(d->titleBarColor().rgb()) > 100)
                         { // yellow isn't good with light backgrounds
                             grad.setColorAt(0, isInactive ? inactiveCol
-                                                          : QColor(243, 176, 43));
+                                                          : col_minimize);
                             grad.setColorAt(1, isInactive ? inactiveCol
-                                                          : QColor(223, 162, 39));
+                                                          : col_minimize);
                         }
                         else
                         {
                             grad.setColorAt(0, isInactive ? inactiveCol
-                                                          : QColor(237, 198, 81));
+                                                          : col_minimize);
                             grad.setColorAt(1, isInactive ? inactiveCol
-                                                          : QColor(217, 181, 74));
+                                                          : col_minimize);
                         }
                         painter->setBrush(QBrush(grad));
                         painter->setPen(Qt::NoPen);
@@ -855,23 +858,23 @@ namespace Breeze
                 if (type() == DecorationButtonType::Close)
                 {
                     if (qGray(d->titleBarColor().rgb()) > 100)
-                        col = QColor(254, 73, 66);
+                        col = col_close;
                     else
-                        col = QColor(240, 77, 80);
+                        col = col_close;
                 }
                 else if (type() == DecorationButtonType::Maximize)
                 {
                     if (qGray(d->titleBarColor().rgb()) > 100)
-                        col = isChecked() ? QColor(0, 188, 154) : QColor(7, 201, 33);
+                        col = isChecked() ? col_maximize : col_maximize;
                     else
-                        col = isChecked() ? QColor(0, 188, 154) : QColor(101, 188, 34);
+                        col = isChecked() ? col_maximize : col_maximize;
                 }
                 else if (type() == DecorationButtonType::Minimize)
                 {
                     if (qGray(d->titleBarColor().rgb()) > 100)
-                        col = QColor(233, 160, 13);
+                        col = col_minimize;
                     else
-                        col = QColor(227, 185, 59);
+                        col = col_minimize;
                 }
                 else if (type() == DecorationButtonType::ApplicationMenu) {
                     if (qGray(d->titleBarColor().rgb()) > 100)
@@ -895,23 +898,23 @@ namespace Breeze
                 if (type() == DecorationButtonType::Close)
                 {
                     if (qGray(d->titleBarColor().rgb()) > 100)
-                        col = QColor(254, 95, 87);
+                        col = col_close;
                     else
-                        col = QColor(240, 96, 97);
+                        col = col_close;
                 }
                 else if (type() == DecorationButtonType::Maximize)
                 {
                     if (qGray(d->titleBarColor().rgb()) > 100)
-                        col = isChecked() ? QColor(64, 188, 168) : QColor(39, 201, 63);
+                        col = isChecked() ? col_maximize : col_maximize;
                     else
-                        col = isChecked() ? QColor(64, 188, 168) : QColor(116, 188, 64);
+                        col = isChecked() ? col_maximize : col_maximize;
                 }
                 else if (type() == DecorationButtonType::Minimize)
                 {
                     if (qGray(d->titleBarColor().rgb()) > 100)
-                        col = QColor(233, 172, 41);
+                        col = col_minimize;
                     else
-                        col = QColor(227, 191, 78);
+                        col = col_minimize;
                 }
                 else if (type() == DecorationButtonType::ApplicationMenu) {
                     if (qGray(d->titleBarColor().rgb()) > 100)
@@ -941,23 +944,23 @@ namespace Breeze
                 if (type() == DecorationButtonType::Close)
                 {
                     if (qGray(d->titleBarColor().rgb()) > 100)
-                        col = QColor(254, 95, 87);
+                        col = col_close;
                     else
-                        col = QColor(240, 96, 97);
+                        col = col_close;
                 }
                 else if (type() == DecorationButtonType::Maximize)
                 {
                     if (qGray(d->titleBarColor().rgb()) > 100)
-                        col = isChecked() ? QColor(64, 188, 168) : QColor(39, 201, 63);
+                        col = isChecked() ? col_maximize : col_maximize;
                     else
-                        col = isChecked() ? QColor(64, 188, 168) : QColor(116, 188, 64);
+                        col = isChecked() ? col_maximize : col_maximize;
                 }
                 else if (type() == DecorationButtonType::Minimize)
                 {
                     if (qGray(d->titleBarColor().rgb()) > 100)
-                        col = QColor(233, 172, 41);
+                        col = col_minimize;
                     else
-                        col = QColor(227, 191, 78);
+                        col = col_minimize;
                 }
                 else if (type() == DecorationButtonType::ApplicationMenu) {
                     if (qGray(d->titleBarColor().rgb()) > 100)
