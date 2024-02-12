@@ -22,11 +22,9 @@
 #include "breezedecoration.h"
 
 #include "breezesettingsprovider.h"
-#include "config-breeze.h"
 #include "config/breezeconfigwidget.h"
 
 #include "breezebutton.h"
-#include "breezesizegrip.h"
 
 #include "breezeboxshadowrenderer.h"
 
@@ -41,14 +39,6 @@
 #include <QPainter>
 #include <QTextStream>
 #include <QTimer>
-
-#if BREEZE_HAVE_X11
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-#include <private/qtx11extras_p.h>
-#else
-#include <QX11Info>
-#endif
-#endif
 
 #include <cmath>
 
@@ -155,11 +145,11 @@ namespace Breeze
     static int g_shadowStrength = 255;
     static QColor g_shadowColor = Qt::black;
     static QSharedPointer<KDecoration2::DecorationShadow> g_sShadow;
+    static QSharedPointer<KDecoration2::DecorationShadow> g_sShadowInactive;
 
     //________________________________________________________________
     Decoration::Decoration(QObject *parent, const QVariantList &args)
         : KDecoration2::Decoration(parent, args)
-        , m_animation( new QVariantAnimation( this ) )
     {
         g_sDecoCount++;
     }
@@ -171,20 +161,8 @@ namespace Breeze
         if (g_sDecoCount == 0) {
             // last deco destroyed, clean up shadow
             g_sShadow.clear();
+            g_sShadowInactive.clear();
         }
-
-        deleteSizeGrip();
-
-    }
-
-    //________________________________________________________________
-    void Decoration::setOpacity( qreal value )
-    {
-        if( m_opacity == value ) return;
-        m_opacity = value;
-        update();
-
-        if( m_sizeGrip ) m_sizeGrip->update();
     }
 
     //________________________________________________________________
@@ -193,13 +171,7 @@ namespace Breeze
 
         const auto c = client().toStrongRef();
         if( hideTitleBar() ) return c->color( ColorGroup::Inactive, ColorRole::TitleBar );
-        else if( m_animation->state() == QAbstractAnimation::Running )
-        {
-            return KColorUtils::mix(
-                c->color( ColorGroup::Inactive, ColorRole::TitleBar ),
-                c->color( ColorGroup::Active, ColorRole::TitleBar ),
-                m_opacity );
-        } else return c->color( c->isActive() ? ColorGroup::Active : ColorGroup::Inactive, ColorRole::TitleBar );
+        return c->color( c->isActive() ? ColorGroup::Active : ColorGroup::Inactive, ColorRole::TitleBar );
 
     }
 
@@ -208,13 +180,7 @@ namespace Breeze
     {
 
         const auto c = client().toStrongRef();
-        if( m_animation->state() == QAbstractAnimation::Running )
-        {
-            return KColorUtils::mix(
-                c->color( ColorGroup::Inactive, ColorRole::Foreground ),
-                c->color( ColorGroup::Active, ColorRole::Foreground ),
-                m_opacity );
-        } else return  c->color( c->isActive() ? ColorGroup::Active : ColorGroup::Inactive, ColorRole::Foreground );
+        return  c->color( c->isActive() ? ColorGroup::Active : ColorGroup::Inactive, ColorRole::Foreground );
 
     }
 
@@ -222,15 +188,6 @@ namespace Breeze
     void Decoration::init()
     {
         const auto c = client().toStrongRef();
-
-        // active state change animation
-        // It is important start and end value are of the same type, hence 0.0 and not just 0
-        m_animation->setStartValue( 0.0 );
-        m_animation->setEndValue( 1.0 );
-        m_animation->setEasingCurve( QEasingCurve::InOutQuad );
-        connect(m_animation, &QVariantAnimation::valueChanged, this, [this](const QVariant &value) {
-            setOpacity(value.toReal());
-        });
 
         reconfigure();
         updateTitleBar();
@@ -265,7 +222,7 @@ namespace Breeze
             }
         );
 
-        connect(c.data(), &KDecoration2::DecoratedClient::activeChanged, this, &Decoration::updateAnimationState);
+        connect(c.data(), &KDecoration2::DecoratedClient::activeChanged, this, &Decoration::updateActiveState);
         connect(c.data(), &KDecoration2::DecoratedClient::widthChanged, this, &Decoration::updateTitleBar);
         connect(c.data(), &KDecoration2::DecoratedClient::maximizedChanged, this, &Decoration::updateTitleBar);
         //connect(c, &KDecoration2::DecoratedClient::maximizedChanged, this, &Decoration::setOpaque);
@@ -288,7 +245,7 @@ namespace Breeze
         });
 
         createButtons();
-        createShadow();
+        updateShadow();
     }
 
     //________________________________________________________________
@@ -305,28 +262,10 @@ namespace Breeze
     }
 
     //________________________________________________________________
-    void Decoration::updateAnimationState()
+    void Decoration::updateActiveState()
     {
-        if( m_internalSettings->animationsEnabled() )
-        {
-
-            const auto c = client().toStrongRef();
-            m_animation->setDirection( c->isActive() ? QAbstractAnimation::Forward : QAbstractAnimation::Backward );
-            if( m_animation->state() != QAbstractAnimation::Running ) m_animation->start();
-
-        } else {
-
-            update();
-
-        }
-    }
-
-    //________________________________________________________________
-    void Decoration::updateSizeGripVisibility()
-    {
-        const auto c = client().toStrongRef();
-        if( m_sizeGrip )
-        { m_sizeGrip->setVisible( c->isResizeable() && !isMaximized() && !c->isShaded() ); }
+        updateShadow(); // active and inactive shadows are different
+        update();
     }
 
     //________________________________________________________________
@@ -375,9 +314,6 @@ namespace Breeze
 
         setScaledCornerRadius();
 
-        // animation
-        m_animation->setDuration( m_internalSettings->animationsDuration() );
-
         // borders
         recalculateBorders();
 
@@ -385,11 +321,7 @@ namespace Breeze
         resetBlurRegion();
 
         // shadow
-        createShadow();
-
-        // size grip
-        if( hasNoBorders() && m_internalSettings->drawSizeGrip() ) createSizeGrip();
-        else deleteSizeGrip();
+        updateShadow();
 
     }
 
@@ -405,21 +337,21 @@ namespace Breeze
         const int bottom = (c->isShaded() || isBottomEdge()) ? 0 : borderSize(true);
 
         int top = 0;
-        if( hideTitleBar() ) top = bottom;
-        else {
-
+        if (hideTitleBar())
+            top = bottom;
+        else
+        {
             QFont f; f.fromString(m_internalSettings->titleBarFont());
             QFontMetrics fm(f);
-            top += qMax(fm.height(), buttonHeight() );
+            top += qMax(fm.height(), buttonHeight());
 
             // padding below
-            // extra pixel is used for the active window outline
+            // extra pixel is used for the active window outline (but not in the shaded state)
             const int baseSize = s->smallSpacing();
-            top += baseSize*Metrics::TitleBar_BottomMargin + 1;
+            top += baseSize*Metrics::TitleBar_BottomMargin + (c->isShaded() ? 0 : 1);
 
             // padding above
             top += baseSize*Metrics::TitleBar_TopMargin;
-
         }
 
         setBorders(QMargins(left, top, right, bottom));
@@ -428,15 +360,16 @@ namespace Breeze
         const int extSize = s->largeSpacing();
         int extSides = 0;
         int extBottom = 0;
-        if( hasNoBorders() )
+        if (hasNoBorders())
         {
-            if( !isMaximizedHorizontally() ) extSides = extSize;
-            if( !isMaximizedVertically() ) extBottom = extSize;
-
-        } else if( hasNoSideBorders() && !isMaximizedHorizontally() ) {
-
+            if (!isMaximizedHorizontally())
+                extSides = extSize;
+            if (!isMaximizedVertically())
+                extBottom = extSize;
+        }
+        else if (hasNoSideBorders() && !isMaximizedHorizontally())
+        {
             extSides = extSize;
-
         }
 
         setResizeOnlyBorders(QMargins(extSides, 0, extSides, extBottom));
@@ -658,7 +591,7 @@ namespace Breeze
         auto s = settings();
 
         // paint background
-        if(!c->isShaded())
+        if (!c->isShaded())
         {
             painter->fillRect(rect(), Qt::transparent);
             painter->save();
@@ -670,10 +603,10 @@ namespace Breeze
             painter->setBrush(winCol);
 
             // clip away the top part
-            if(!hideTitleBar())
+            if (!hideTitleBar())
                 painter->setClipRect(0, borderTop(), size().width(), size().height() - borderTop(), Qt::IntersectClip);
 
-            if(s->isAlphaChannelSupported())
+            if (s->isAlphaChannelSupported())
                 painter->drawRoundedRect(rect(), m_scaledCornerRadius, m_scaledCornerRadius);
             else
                 painter->drawRect(rect());
@@ -681,9 +614,10 @@ namespace Breeze
             painter->restore();
         }
 
-        if(!hideTitleBar()) paintTitleBar(painter, repaintRegion);
+        if (!hideTitleBar())
+            paintTitleBar(painter, repaintRegion);
 
-        if(hasBorders() && !s->isAlphaChannelSupported())
+        if (hasBorders() && !s->isAlphaChannelSupported())
         {
             painter->save();
             painter->setRenderHint(QPainter::Antialiasing, false);
@@ -795,7 +729,13 @@ namespace Breeze
 
     //________________________________________________________________
     int Decoration::captionHeight() const
-    { return hideTitleBar() ? borderTop() : borderTop() - settings()->smallSpacing()*(Metrics::TitleBar_BottomMargin + Metrics::TitleBar_TopMargin ) - 1; }
+    {
+        const auto c = client().toStrongRef();
+        return hideTitleBar() ? borderTop()
+                              : borderTop()
+                                - settings()->smallSpacing()*(Metrics::TitleBar_BottomMargin + Metrics::TitleBar_TopMargin )
+                                - (c->isShaded() ? 0 : 1); // see recalculateBorders()
+    }
 
     //________________________________________________________________
     QPair<QRect,Qt::Alignment> Decoration::captionRect() const
@@ -855,12 +795,15 @@ namespace Breeze
     }
 
     //________________________________________________________________
-    void Decoration::createShadow()
+    void Decoration::updateShadow()
     {
-        if (!g_sShadow
-                ||g_shadowSizeEnum != m_internalSettings->shadowSize()
-                || g_shadowStrength != m_internalSettings->shadowStrength()
-                || g_shadowColor != m_internalSettings->shadowColor())
+        const auto c = client().toStrongRef();
+        auto &shadow = c->isActive() ? g_sShadow : g_sShadowInactive;
+
+        if (!shadow
+            || g_shadowSizeEnum != m_internalSettings->shadowSize()
+            || g_shadowStrength != m_internalSettings->shadowStrength()
+            || g_shadowColor != m_internalSettings->shadowColor())
         {
             g_shadowSizeEnum = m_internalSettings->shadowSize();
             g_shadowStrength = m_internalSettings->shadowStrength();
@@ -869,7 +812,8 @@ namespace Breeze
             const CompositeShadowParams params = lookupShadowParams(g_shadowSizeEnum);
             if (params.isNone()) {
                 g_sShadow.clear();
-                setShadow(g_sShadow);
+                g_sShadowInactive.clear();
+                setShadow(shadow);
                 return;
             }
 
@@ -886,7 +830,7 @@ namespace Breeze
             shadowRenderer.setBorderRadius(m_scaledCornerRadius + 0.5);
             shadowRenderer.setBoxSize(boxSize);
 
-            const qreal strength = static_cast<qreal>(g_shadowStrength) / 255.0;
+            const qreal strength = static_cast<qreal>(g_shadowStrength) / 255.0 * (c->isActive() ? 1.0 : 0.5);
             shadowRenderer.addShadow(params.shadow1.offset, params.shadow1.radius,
                 withOpacity(g_shadowColor, params.shadow1.opacity * strength));
             shadowRenderer.addShadow(params.shadow2.offset, params.shadow2.radius,
@@ -929,48 +873,13 @@ namespace Breeze
 
             painter.end();
 
-            g_sShadow = QSharedPointer<KDecoration2::DecorationShadow>::create();
-            g_sShadow->setPadding(padding);
-            g_sShadow->setInnerShadowRect(QRect(outerRect.center(), QSize(1, 1)));
-            g_sShadow->setShadow(shadowTexture);
+            shadow = QSharedPointer<KDecoration2::DecorationShadow>::create();
+            shadow->setPadding(padding);
+            shadow->setInnerShadowRect(QRect(outerRect.center(), QSize(1, 1)));
+            shadow->setShadow(shadowTexture);
         }
 
-        setShadow(g_sShadow);
-    }
-
-    //_________________________________________________________________
-    void Decoration::createSizeGrip()
-    {
-
-        // do nothing if size grip already exist
-        if( m_sizeGrip ) return;
-
-        #if BREEZE_HAVE_X11
-        if( !QX11Info::isPlatformX11() ) return;
-
-        // access client
-        auto c = client().toStrongRef();
-        if( !c ) return;
-
-        if( c->windowId() != 0 )
-        {
-            m_sizeGrip = new SizeGrip( this );
-            connect( c.data(), &KDecoration2::DecoratedClient::maximizedChanged, this, &Decoration::updateSizeGripVisibility );
-            connect( c.data(), &KDecoration2::DecoratedClient::shadedChanged, this, &Decoration::updateSizeGripVisibility );
-            connect( c.data(), &KDecoration2::DecoratedClient::resizeableChanged, this, &Decoration::updateSizeGripVisibility );
-        }
-        #endif
-
-    }
-
-    //_________________________________________________________________
-    void Decoration::deleteSizeGrip()
-    {
-        if( m_sizeGrip )
-        {
-            m_sizeGrip->deleteLater();
-            m_sizeGrip = nullptr;
-        }
+        setShadow(shadow);
     }
 
     void Decoration::setScaledCornerRadius()

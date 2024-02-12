@@ -33,8 +33,6 @@
 #include <QVariant>
 #include <QVariantAnimation>
 
-class QVariantAnimation;
-
 namespace KDecoration2
 {
     class DecorationButton;
@@ -43,7 +41,6 @@ namespace KDecoration2
 
 namespace Breeze
 {
-    class SizeGrip;
     class Decoration : public KDecoration2::Decoration
     {
         Q_OBJECT
@@ -68,15 +65,6 @@ namespace Breeze
 
         //* button height
         int buttonHeight() const;
-
-        //*@name active state change animation
-        //@{
-        void setOpacity( qreal );
-
-        qreal opacity() const
-        { return m_opacity; }
-
-        //@}
 
         //*@name colors
         //@{
@@ -108,8 +96,7 @@ namespace Breeze
         void updateButtonsGeometry();
         void updateButtonsGeometryDelayed();
         void updateTitleBar();
-        void updateAnimationState();
-        void updateSizeGripVisibility();
+        void updateActiveState();
 
         private:
 
@@ -118,7 +105,7 @@ namespace Breeze
 
         void createButtons();
         void paintTitleBar(QPainter *painter, const QRect &repaintRegion);
-        void createShadow();
+        void updateShadow();
 
         void setScaledCornerRadius();
 
@@ -137,26 +124,9 @@ namespace Breeze
         inline int titleBarAlpha() const;
         //@}
 
-        //*@name size grip
-        //@{
-        void createSizeGrip();
-        void deleteSizeGrip();
-        SizeGrip* sizeGrip() const
-        { return m_sizeGrip; }
-        //@}
-
         InternalSettingsPtr m_internalSettings;
         KDecoration2::DecorationButtonGroup *m_leftButtons = nullptr;
         KDecoration2::DecorationButtonGroup *m_rightButtons = nullptr;
-
-        //* size grip widget
-        SizeGrip *m_sizeGrip = nullptr;
-
-        //* active state change animation
-        QVariantAnimation *m_animation;
-
-        //* active state change opacity
-        qreal m_opacity = 0;
 
         //*frame corner radius, scaled according to DPI
         qreal m_scaledCornerRadius = 3;
@@ -181,36 +151,42 @@ namespace Breeze
     }
 
     bool Decoration::isMaximized() const
-    { return client().toStrongRef().data()->isMaximized() && !m_internalSettings->drawBorderOnMaximizedWindows(); }
+    {
+        return client().toStrongRef().data()->isMaximized();
+    }
 
     bool Decoration::isMaximizedHorizontally() const
-    { return client().toStrongRef().data()->isMaximizedHorizontally() && !m_internalSettings->drawBorderOnMaximizedWindows(); }
+    {
+        return client().toStrongRef().data()->isMaximizedHorizontally();
+    }
 
     bool Decoration::isMaximizedVertically() const
-    { return client().toStrongRef().data()->isMaximizedVertically() && !m_internalSettings->drawBorderOnMaximizedWindows(); }
+    {
+        return client().toStrongRef().data()->isMaximizedVertically();
+    }
 
     bool Decoration::isLeftEdge() const
     {
         const auto c = client().toStrongRef();
-        return (c->isMaximizedHorizontally() || c->adjacentScreenEdges().testFlag( Qt::LeftEdge ) ) && !m_internalSettings->drawBorderOnMaximizedWindows();
+        return (c->isMaximizedHorizontally() || c->adjacentScreenEdges().testFlag(Qt::LeftEdge));
     }
 
     bool Decoration::isRightEdge() const
     {
         const auto c = client().toStrongRef();
-        return (c->isMaximizedHorizontally() || c->adjacentScreenEdges().testFlag( Qt::RightEdge ) ) && !m_internalSettings->drawBorderOnMaximizedWindows();
+        return (c->isMaximizedHorizontally() || c->adjacentScreenEdges().testFlag(Qt::RightEdge));
     }
 
     bool Decoration::isTopEdge() const
     {
         const auto c = client().toStrongRef();
-        return (c->isMaximizedVertically() || c->adjacentScreenEdges().testFlag( Qt::TopEdge ) ) && !m_internalSettings->drawBorderOnMaximizedWindows();
+        return (c->isMaximizedVertically() || c->adjacentScreenEdges().testFlag(Qt::TopEdge));
     }
 
     bool Decoration::isBottomEdge() const
     {
         const auto c = client().toStrongRef();
-        return (c->isMaximizedVertically() || c->adjacentScreenEdges().testFlag( Qt::BottomEdge ) ) && !m_internalSettings->drawBorderOnMaximizedWindows();
+        return (c->isMaximizedVertically() || c->adjacentScreenEdges().testFlag(Qt::BottomEdge));
     }
 
     bool Decoration::hideTitleBar() const
